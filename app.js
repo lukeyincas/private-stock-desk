@@ -3,6 +3,7 @@ const DRAWINGS_STORAGE_KEY = "private-stock-desk-drawings-v1";
 const DISPLAY_DECIMALS = 2;
 const CHART_DECIMALS = 3;
 const LOCAL_DATA_ORIGIN = "http://127.0.0.1:4173";
+const PUBLIC_DATA_ORIGIN = "https://private-stock-desk-api-lukeyincas.onrender.com";
 const CHART_MARGIN = Object.freeze({ top: 24, right: 80, bottom: 42, left: 16 });
 const CHART_AXIS_GAP = 8;
 
@@ -609,24 +610,25 @@ function buildMarketDataUrl(symbol, yahooTicker, config, market = "US") {
     interval: config.interval,
   });
 
-  if (shouldUseLocalDataProxy()) {
-    return buildLocalApiUrl(`/api/chart?${params.toString()}`);
-  }
-
-  return `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    yahooTicker,
-  )}?range=${config.range}&interval=${config.interval}&includePrePost=false&events=div%2Csplits`;
+  return buildMarketDataApiUrl(`/api/chart?${params.toString()}`);
 }
 
 function shouldUseLocalDataProxy() {
-  return window.location.protocol === "file:" || ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  return true;
 }
 
 function buildLocalApiUrl(path) {
   if (["127.0.0.1", "localhost"].includes(window.location.hostname)) {
     return path;
   }
-  return `${LOCAL_DATA_ORIGIN}${path}`;
+  return buildMarketDataApiUrl(path);
+}
+
+function buildMarketDataApiUrl(path) {
+  if (window.location.protocol === "file:") {
+    return `${LOCAL_DATA_ORIGIN}${path}`;
+  }
+  return `${PUBLIC_DATA_ORIGIN}${path}`;
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs) {
@@ -644,12 +646,20 @@ async function fetchJsonWithTimeout(url, timeoutMs) {
     }
     return await response.json();
   } catch (error) {
-    if (String(url).startsWith(LOCAL_DATA_ORIGIN)) {
+    if (
+      String(url).startsWith(LOCAL_DATA_ORIGIN) ||
+      String(url).startsWith(PUBLIC_DATA_ORIGIN)
+    ) {
       const isAbort = error?.name === "AbortError";
+      const isPublicService = String(url).startsWith(PUBLIC_DATA_ORIGIN);
       throw new Error(
-        isAbort
-          ? "本地行情服务响应超时，请确认启动窗口没有报错。"
-          : "本地行情服务未启动，请双击“启动投资工作台.command”。",
+        isPublicService
+          ? isAbort
+            ? "公网行情服务正在启动或响应超时，请稍后重试。"
+            : "公网行情服务暂时不可用，请稍后重试。"
+          : isAbort
+            ? "本地行情服务响应超时，请确认启动窗口没有报错。"
+            : "本地行情服务未启动，请双击“启动投资工作台.command”。",
       );
     }
     throw error;
@@ -661,15 +671,24 @@ async function fetchJsonWithTimeout(url, timeoutMs) {
 async function checkLocalServerVersion() {
   if (!shouldUseLocalDataProxy()) return;
   try {
-    const data = await fetchJsonWithTimeout(buildLocalApiUrl("/api/version"), 3500);
+    const isPublicPage = ![
+      "127.0.0.1",
+      "localhost",
+    ].includes(window.location.hostname) && window.location.protocol !== "file:";
+    const data = await fetchJsonWithTimeout(buildLocalApiUrl("/api/version"), isPublicPage ? 20000 : 3500);
     const cnSource = String(data?.cnSource ?? "");
     state.serverWarning =
       cnSource.includes("东方财富") && cnSource.includes("新浪财经")
         ? ""
         : "本地服务版本较旧，请重新双击启动文件。";
   } catch (error) {
-    state.serverWarning =
-      window.location.protocol === "file:"
+    const isPublicPage = ![
+      "127.0.0.1",
+      "localhost",
+    ].includes(window.location.hostname) && window.location.protocol !== "file:";
+    state.serverWarning = isPublicPage
+      ? "公网行情服务暂时不可用或正在启动，请稍后点击刷新行情。"
+      : window.location.protocol === "file:"
         ? "在线行情需要先双击“启动投资工作台.command”。直接打开页面时，只能录入和查看本地持仓。"
         : "本地行情服务未启动或已中断，请重新双击“启动投资工作台.command”。";
   }
