@@ -631,6 +631,13 @@ function buildMarketDataApiUrl(path) {
   return `${PUBLIC_DATA_ORIGIN}${path}`;
 }
 
+function isPublicAppPage() {
+  return (
+    window.location.protocol !== "file:" &&
+    !["127.0.0.1", "localhost"].includes(window.location.hostname)
+  );
+}
+
 async function fetchJsonWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -671,21 +678,17 @@ async function fetchJsonWithTimeout(url, timeoutMs) {
 async function checkLocalServerVersion() {
   if (!shouldUseLocalDataProxy()) return;
   try {
-    const isPublicPage = ![
-      "127.0.0.1",
-      "localhost",
-    ].includes(window.location.hostname) && window.location.protocol !== "file:";
+    const isPublicPage = isPublicAppPage();
     const data = await fetchJsonWithTimeout(buildLocalApiUrl("/api/version"), isPublicPage ? 20000 : 3500);
     const cnSource = String(data?.cnSource ?? "");
     state.serverWarning =
       cnSource.includes("东方财富") && cnSource.includes("新浪财经")
         ? ""
-        : "本地服务版本较旧，请重新双击启动文件。";
+        : isPublicPage
+          ? "公网行情服务版本异常，请稍后重试。"
+          : "本地服务版本较旧，请重新双击启动文件。";
   } catch (error) {
-    const isPublicPage = ![
-      "127.0.0.1",
-      "localhost",
-    ].includes(window.location.hostname) && window.location.protocol !== "file:";
+    const isPublicPage = isPublicAppPage();
     state.serverWarning = isPublicPage
       ? "公网行情服务暂时不可用或正在启动，请稍后点击刷新行情。"
       : window.location.protocol === "file:"
@@ -947,11 +950,14 @@ function renderDataStatus() {
     .map(([source, count]) => `${source} ${count} 只`)
     .join("，");
   const updated = state.lastUpdated ? formatDateTime(state.lastUpdated) : "尚未刷新";
+  const serviceNote = isPublicAppPage()
+    ? "说明：在线版会自动连接公网行情服务。免费服务休眠后首次刷新可能需要约一分钟启动。"
+    : "说明：本地行情需要先启动本地服务。请优先双击“启动投资工作台.command”。";
   els.dataStatus.innerHTML = `
     <div><strong>当前来源：</strong>${sourceText || "等待添加持仓"}</div>
     <div><strong>最近刷新：</strong>${updated}</div>
     ${state.serverWarning ? `<div class="status-warning">${state.serverWarning}</div>` : ""}
-    <div>说明：在线行情需要本地行情服务运行。请优先双击“启动投资工作台.command”；若只直接打开 index.html，页面仍可录入和查看持仓，但行情可能不可用。</div>
+    <div>${serviceNote}</div>
   `;
 }
 
