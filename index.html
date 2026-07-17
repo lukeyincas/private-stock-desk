@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>私人股票投资工作台</title>
+    <link rel="stylesheet" href="./styles.css?v=20260702-day-pnl-reference-26" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PRIVATE STOCK DESK</p>
+          <h1>私人股票投资工作台</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="market-clock" id="marketClock">--</div>
+          <button class="secondary-button" id="importButton" type="button" title="导入持仓 JSON">
+            <span data-icon="upload"></span>
+            导入
+          </button>
+          <button class="secondary-button" id="exportButton" type="button" title="导出持仓 JSON">
+            <span data-icon="download"></span>
+            导出
+          </button>
+          <button class="primary-button" id="refreshButton" type="button" title="刷新行情">
+            <span data-icon="refresh"></span>
+            刷新行情
+          </button>
+          <input id="importFile" type="file" accept="application/json" hidden />
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="workspace-panel">
+          <section class="tool-panel">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">POSITION ENTRY</p>
+                <h2 id="formTitle">添加持仓</h2>
+              </div>
+              <button class="icon-button" id="resetFormButton" type="button" title="清空表单">
+                <span data-icon="plus"></span>
+              </button>
+            </div>
+
+            <form id="holdingForm" class="holding-form" autocomplete="off">
+              <input id="holdingId" type="hidden" />
+              <label>
+                市场
+                <select id="marketInput" name="market">
+                  <option value="US">美股</option>
+                  <option value="CN">A 股</option>
+                </select>
+              </label>
+              <label>
+                股票代码
+                <input id="symbolInput" name="symbol" required placeholder="美股如 AAPL；A 股如 600519" />
+              </label>
+              <label>
+                股票名称
+                <input id="nameInput" name="name" placeholder="可选，例如 Apple / 贵州茅台" />
+              </label>
+              <div class="form-row">
+                <label>
+                  持股数量
+                  <input id="sharesInput" name="shares" type="number" min="0" step="0.0001" required placeholder="10" />
+                </label>
+                <label>
+                  持仓均价
+                  <input id="avgCostInput" name="avgCost" type="number" min="0" step="0.0001" required placeholder="180.00" />
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  目标价
+                  <input id="targetInput" name="targetPrice" type="number" min="0" step="0.0001" placeholder="可选" />
+                </label>
+                <label>
+                  止损/警戒价
+                  <input id="stopInput" name="stopLoss" type="number" min="0" step="0.0001" placeholder="可选" />
+                </label>
+              </div>
+              <label>
+                买入理由 / 观察点
+                <textarea id="notesInput" name="notes" rows="4" placeholder="例如：长期持有，关注下季度营收和利润率"></textarea>
+              </label>
+              <button class="primary-button full-width" type="submit">
+                <span data-icon="save"></span>
+                保存持仓
+              </button>
+            </form>
+          </section>
+
+          <section class="tool-panel">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">DATA SOURCE</p>
+                <h2>行情状态</h2>
+              </div>
+            </div>
+            <div class="data-status" id="dataStatus"></div>
+            <div class="compact-actions">
+              <button class="secondary-button" id="loadSampleButton" type="button">
+                <span data-icon="database"></span>
+                载入示例
+              </button>
+              <button class="danger-button" id="clearButton" type="button">
+                <span data-icon="trash"></span>
+                清空数据
+              </button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="dashboard">
+          <section class="summary-grid" id="summaryGrid"></section>
+
+          <section class="table-section">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">PORTFOLIO</p>
+                <h2>我的持仓</h2>
+              </div>
+              <span class="muted" id="holdingCount">0 只股票</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>股票</th>
+                    <th>数量</th>
+                    <th>均价</th>
+                    <th>现价</th>
+                    <th>市值</th>
+                    <th>总盈亏</th>
+                    <th>今日</th>
+                    <th>仓位</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="holdingsBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="detail-grid">
+            <div class="chart-section">
+              <div class="chart-header">
+                <div>
+                  <p class="kicker">DETAIL</p>
+                  <h2 id="detailTitle">选择一只持仓</h2>
+                  <p class="muted" id="detailSubtitle">K 线、成本线和当前盈亏会显示在这里</p>
+                </div>
+                <div class="chart-actions">
+                  <div class="range-tabs" id="rangeTabs" role="tablist" aria-label="K 线周期">
+                    <button type="button" data-timeframe="15m">15m</button>
+                    <button type="button" data-timeframe="1H">1H</button>
+                    <button type="button" data-timeframe="4H">4H</button>
+                    <button type="button" data-timeframe="1D" class="active">1D</button>
+                    <button type="button" data-timeframe="1W">1W</button>
+                  </div>
+                  <button class="icon-button" id="drawLineButton" type="button" title="画线">
+                    <span data-icon="trendLine"></span>
+                  </button>
+                  <button class="icon-button" id="toggleDrawingsButton" type="button" title="隐藏线条">
+                    <span data-icon="eye"></span>
+                  </button>
+                  <button class="icon-button" id="undoDrawingButton" type="button" title="删除上一条线">
+                    <span data-icon="undo"></span>
+                  </button>
+                  <button class="icon-button" id="clearDrawingsButton" type="button" title="清除所有线">
+                    <span data-icon="trash"></span>
+                  </button>
+                  <button class="icon-button" id="fullscreenChartButton" type="button" title="全屏图表">
+                    <span data-icon="expand"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="chart-canvas-wrap">
+                <canvas id="priceChart" aria-label="股票 K 线图"></canvas>
+              </div>
+            </div>
+
+            <div class="insight-section">
+              <div class="section-heading">
+                <div>
+                  <p class="kicker">WATCHLIST</p>
+                  <h2>今日关注</h2>
+                </div>
+              </div>
+              <div id="insightList" class="insight-list"></div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js?v=20260702-day-pnl-reference-26"></script>
+  </body>
+</html>
